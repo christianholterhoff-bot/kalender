@@ -1,3 +1,4 @@
+
 <!doctype html>
 <html lang="de">
 <head>
@@ -302,7 +303,6 @@ textarea{min-height:90px;resize:vertical;font-family:var(--mono);font-size:13px;
         </div>
       </div>
       <div class="wtips">
-        <div class="wtip" id="wtipToday"></div>
         <div class="wtip wtip2" id="wtipTom"></div>
       </div>
     </div>
@@ -449,6 +449,7 @@ textarea{min-height:90px;resize:vertical;font-family:var(--mono);font-size:13px;
       <label class="switch"><input type="checkbox" id="googleColors"> Farben aus Google Kalender übernehmen</label>
       <label class="switch"><input type="checkbox" id="googleChrome"> Googles eigene Bedienleiste einblenden</label>
     </div>
+    <p class="hint">Hinweis: Google gibt bei eingebetteten Kalendern nur eine Farbe je Kalender heraus, keine einzelnen Termin Farben (Labels). Das ist eine Grenze von Google selbst und lässt sich hier nicht umgehen.</p>
 
     <h3>Auf ein anderes Gerät übertragen</h3>
     <p class="hint">Die Einstellungen liegen nur in diesem Browser. Mit dem Übertragungstext richtest du das iPad in einem Schritt genauso ein: Text kopieren, auf dem iPad hier einfügen und übernehmen.</p>
@@ -592,7 +593,7 @@ textarea{min-height:90px;resize:vertical;font-family:var(--mono);font-size:13px;
 
 /* ---------------- Konfiguration ---------------- */
 var KEY = "kuechenkalender.v1";
-var FASSUNG = "9, 20. September 2026";
+var FASSUNG = "10, 20. September 2026";
 var cspHits = [];
 try{
   document.addEventListener("securitypolicyviolation", function(e){
@@ -878,28 +879,55 @@ function weatherStatus(text, hint){
   $("wrange").textContent = "";
   $("whours").innerHTML = "";
   $("wtom").hidden = true;
-  $("wtipToday").textContent = "";
   $("wtipTom").textContent = "";
   drawWeatherIcon("cloud");
 }
 
-/* Kleidung und Ausblick */
+/* Kleidung fuer morgen, komplett von Kopf bis Fuss */
 function outfitTip(tmin, tmax, code, pprob, psum, wind){
-  var parts = [];
-  if(tmax < 1) parts.push("dicke Winterjacke, Mütze und Handschuhe");
-  else if(tmax < 8) parts.push("Winterjacke und Mütze");
-  else if(tmax < 13) parts.push("warme Jacke");
-  else if(tmax < 18) parts.push("Übergangsjacke");
-  else if(tmax < 23) parts.push("Pullover oder leichte Jacke");
-  else parts.push("T Shirt reicht");
-  if((tmax - tmin) >= 10) parts.push("morgens kühl, lieber Zwiebellook");
   var snow = [71,73,75,77,85,86].indexOf(code) >= 0;
-  if(snow) parts.push("Schneesachen und feste Schuhe");
-  else if(pprob >= 55 || psum >= 2) parts.push("Regenjacke nicht vergessen");
-  else if(pprob >= 30) parts.push("Regenschirm einstecken");
-  if(wind >= 35) parts.push("es wird windig");
-  if(tmax >= 25 && [0,1,2].indexOf(code) >= 0) parts.push("Sonnenschutz");
-  return parts.slice(0,3).join(", ");
+  var rain = pprob >= 30 || psum >= 1;
+  var veryCold = tmax < 1;
+  var cold = tmax < 8;
+  var warmSun = tmax >= 23 && [0,1,2].indexOf(code) >= 0;
+
+  var kopf;
+  if(veryCold) kopf = "warme Mütze";
+  else if(cold) kopf = "Mütze";
+  else if(warmSun) kopf = "Sonnenhut oder Cappy";
+  else kopf = "keine Kopfbedeckung nötig";
+
+  var oben;
+  if(veryCold) oben = "dicke Winterjacke über warmem Pullover";
+  else if(tmax < 8) oben = "Winterjacke";
+  else if(tmax < 13) oben = "warme Jacke";
+  else if(tmax < 18) oben = "Übergangsjacke";
+  else if(tmax < 23) oben = "Pullover oder leichte Jacke";
+  else oben = "T Shirt reicht";
+  if((tmax - tmin) >= 10) oben += ", morgens kühl also lieber im Zwiebellook";
+
+  var beine;
+  if(tmax < 16) beine = "lange Hose";
+  else if(tmax < 22) beine = "lange oder leichte Hose";
+  else beine = "auch kurze Hose möglich";
+
+  var fuesse;
+  if(snow) fuesse = "warme, wasserdichte Winterstiefel";
+  else if(rain) fuesse = "wasserdichte Schuhe oder Gummistiefel";
+  else if(cold) fuesse = "warme, feste Schuhe";
+  else fuesse = "normale Schuhe";
+
+  var extras = [];
+  if(veryCold) extras.push("Handschuhe");
+  if(snow) extras.push("Schneesachen");
+  else if(psum >= 2 || pprob >= 55) extras.push("Regenjacke");
+  else if(rain) extras.push("Regenschirm einstecken");
+  if(wind >= 35) extras.push("es wird windig");
+  if(warmSun) extras.push("Sonnenschutz");
+
+  var out = "Kopf: " + kopf + ". Oberkörper: " + oben + ". Beine: " + beine + ". Füße: " + fuesse + ".";
+  if(extras.length) out += " Dazu: " + extras.join(", ") + ".";
+  return out;
 }
 function dayVals(d, i){
   var dd = d.daily || {};
@@ -911,22 +939,13 @@ function dayVals(d, i){
   };
 }
 function renderOutlook(d){
-  var t0 = dayVals(d, 0);
-  if(t0.tmax !== null){
-    $("wtipToday").innerHTML = "<b>Heute:</b> " + outfitTip(t0.tmin, t0.tmax, t0.code, t0.pprob, t0.psum, t0.wind);
-  }
   var t1 = dayVals(d, 1);
   if(t1.tmax === null){ $("wtom").hidden = true; $("wtipTom").textContent = ""; return; }
   $("wtom").hidden = false;
   var info = weatherInfo(t1.code);
   $("wtomIcon").innerHTML = '<svg viewBox="0 0 24 24">'+(ICONS[info.icon]||ICONS.cloud)+'</svg>';
   $("wtomTemp").textContent = Math.round(t1.tmin) + "° / " + Math.round(t1.tmax) + "°";
-  var extra = info.text;
-  if(t1.pprob >= 30){
-    var nass = /Regen|Schauer|Schnee|Niesel|Gewitter/.test(info.text);
-    extra += nass ? " " + Math.round(t1.pprob) + " %" : ", Regen " + Math.round(t1.pprob) + " %";
-  }
-  $("wtipTom").innerHTML = "<b>Morgen:</b> " + extra + ", " + outfitTip(t1.tmin, t1.tmax, t1.code, t1.pprob, t1.psum, t1.wind);
+  $("wtipTom").innerHTML = "<b>Morgen anziehen:</b> " + outfitTip(t1.tmin, t1.tmax, t1.code, t1.pprob, t1.psum, t1.wind);
 }
 function omUrl(){
   return "https://api.open-meteo.com/v1/forecast?latitude="+encodeURIComponent(cfg.place.lat)
@@ -1575,12 +1594,12 @@ function press(k){
   if(k === "C"){ G.entry = ""; }
   else if(k === "OK"){ check(true); return; }
   else if(G.entry.length < 4){ G.entry += k; }
-  $("gAnswer").textContent = G.entry || " ";
+  $("gAnswer").textContent = G.entry || " ";
   var product = G.a * G.b;
   if(G.entry.length >= String(product).length) check(false);
 }
 function check(manual){
-  if(!G.entry){ if(manual) $("gAnswer").textContent = " "; return; }
+  if(!G.entry){ if(manual) $("gAnswer").textContent = " "; return; }
   var product = G.a * G.b;
   var t = $("gTask");
   G.locked = true;
